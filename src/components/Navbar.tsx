@@ -5,16 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from 'lucide-react';
 
 const navItems = [
-  { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
-  { name: 'Bin Attenders', path: '/bin-attenders' },
-  { name: 'Customers', path: '/customers' },
-  { name: 'Customer Care', path: '/customer-care' },
+  { name: 'Home', path: '/', section: 'home' },
+  { name: 'About', path: '/about', section: 'about' },
+  { name: 'Bin Attenders', path: '/bin-attenders', section: 'binAttenders' },
+  { name: 'Customers', path: '/customers', section: 'customers' },
+  { name: 'Customer Care', path: '/customer-care', section: 'customerCare' },
 ];
 
-const Navbar = () => {
+interface NavbarProps {
+  onNavClick?: (section: string) => void;
+  activeSection?: string | null;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ onNavClick, activeSection }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeItem, setActiveItem] = useState('Home');
+
+  const handleNavItemClick = (itemName: string, itemSection?: string) => {
+    setActiveItem(itemName);
+    
+    // If we're on the home page and have a section to scroll to
+    if (onNavClick && itemSection) {
+      onNavClick(itemSection);
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-sm border-b">
@@ -33,8 +47,8 @@ const Navbar = () => {
                 <Link
                   key={item.name}
                   to={item.path}
-                  className={`nav-item ${activeItem === item.name ? 'active' : ''}`}
-                  onClick={() => setActiveItem(item.name)}
+                  className={`nav-item ${activeItem === item.name || (activeSection === item.section) ? 'active' : ''}`}
+                  onClick={() => handleNavItemClick(item.name, item.section)}
                 >
                   {item.name}
                 </Link>
@@ -74,9 +88,9 @@ const Navbar = () => {
                 key={item.name}
                 to={item.path}
                 className={`block px-3 py-2 rounded-md text-base font-medium 
-                  ${activeItem === item.name ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-secondary'}`}
+                  ${activeItem === item.name || (activeSection === item.section) ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-secondary'}`}
                 onClick={() => {
-                  setActiveItem(item.name);
+                  handleNavItemClick(item.name, item.section);
                   setMobileMenuOpen(false);
                 }}
               >
