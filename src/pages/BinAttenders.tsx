@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -12,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Map, Truck, MapPin, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Mock data for bin locations and status
 const binsData = [
   { id: 1, location: 'Main Street #103', lat: 40.7128, lng: -74.006, fillLevel: 85, lastCollected: '2023-04-10', binType: 'General Waste' },
   { id: 2, location: 'Park Avenue #87', lat: 40.7193, lng: -73.9916, fillLevel: 45, lastCollected: '2023-04-15', binType: 'Recycling' },
@@ -22,7 +20,6 @@ const binsData = [
   { id: 6, location: 'Oak Street #113', lat: 40.7264, lng: -74.0094, fillLevel: 65, lastCollected: '2023-04-14', binType: 'General Waste' },
 ];
 
-// Login form component
 const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +29,6 @@ const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
     e.preventDefault();
     
     if (email && password) {
-      // In a real app, this would be a proper authentication
       toast({
         title: "Login successful",
         description: "Welcome back driver!",
@@ -82,7 +78,6 @@ const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
   );
 };
 
-// Bin status indicator component
 const BinStatusIndicator = ({ fillLevel }: { fillLevel: number }) => {
   let statusColor = '';
   let statusLabel = '';
@@ -112,13 +107,10 @@ const BinStatusIndicator = ({ fillLevel }: { fillLevel: number }) => {
   );
 };
 
-// The main bin attenders dashboard
 const DriverDashboard = () => {
-  // State for the active bin and routes
   const [activeBin, setActiveBin] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Function to handle bin collection
   const handleCollectBin = (binId: number) => {
     toast({
       title: "Bin Marked for Collection",
@@ -129,7 +121,6 @@ const DriverDashboard = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar / Profile */}
         <div className="w-full md:w-1/4">
           <Card>
             <CardHeader>
@@ -194,7 +185,6 @@ const DriverDashboard = () => {
           </Card>
         </div>
         
-        {/* Main Content */}
         <div className="w-full md:w-3/4">
           <Tabs defaultValue="map">
             <TabsList className="grid w-full grid-cols-2">
@@ -202,7 +192,6 @@ const DriverDashboard = () => {
               <TabsTrigger value="list">List View</TabsTrigger>
             </TabsList>
             
-            {/* Map View Tab */}
             <TabsContent value="map" className="mt-4">
               <Card>
                 <CardHeader>
@@ -211,7 +200,6 @@ const DriverDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-[16/9] bg-background rounded-md border overflow-hidden relative">
-                    {/* This would be a real map in a production app */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Map className="h-12 w-12 text-muted-foreground animate-pulse" />
                     </div>
@@ -219,7 +207,6 @@ const DriverDashboard = () => {
                       <p className="text-white text-lg font-semibold">Interactive Map View</p>
                     </div>
                     
-                    {/* Example map pins that would be on the real map */}
                     <div className="absolute top-1/4 left-1/3 animate-pulse-slow">
                       <div className="relative">
                         <MapPin className="h-6 w-6 text-waste-high" />
@@ -242,7 +229,7 @@ const DriverDashboard = () => {
                   <div className="mt-6 flex flex-wrap gap-4">
                     <div className="flex items-center">
                       <div className="h-3 w-3 rounded-full bg-waste-high mr-2"></div>
-                      <span className="text-sm">High Priority (>75%)</span>
+                      <span className="text-sm">High Priority (&gt;75%)</span>
                     </div>
                     <div className="flex items-center">
                       <div className="h-3 w-3 rounded-full bg-waste-medium mr-2"></div>
@@ -250,14 +237,13 @@ const DriverDashboard = () => {
                     </div>
                     <div className="flex items-center">
                       <div className="h-3 w-3 rounded-full bg-waste-low mr-2"></div>
-                      <span className="text-sm">Low Priority (<40%)</span>
+                      <span className="text-sm">Low Priority (&lt;40%)</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
             
-            {/* List View Tab */}
             <TabsContent value="list" className="mt-4">
               <Card>
                 <CardHeader>
@@ -295,7 +281,6 @@ const DriverDashboard = () => {
                             </Button>
                           </div>
                           
-                          {/* Progress bar for fill level */}
                           <div className="mt-3 w-full bg-secondary rounded-full h-2">
                             <div 
                               className={`h-2 rounded-full ${
@@ -314,7 +299,6 @@ const DriverDashboard = () => {
             </TabsContent>
           </Tabs>
           
-          {/* Route Planning Section */}
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Today's Collection Route</CardTitle>
