@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Map, Truck, MapPin, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User } from 'lucide-react';
+import { Map, Truck, MapPin, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 const binsData = [
   { id: 1, location: 'Main Street #103', lat: 40.7128, lng: -74.006, fillLevel: 85, lastCollected: '2023-04-10', binType: 'General Waste' },
@@ -107,8 +109,73 @@ const BinStatusIndicator = ({ fillLevel }: { fillLevel: number }) => {
   );
 };
 
+const FeatureInfoPopup = ({ title, description, icon }: { title: string; description: string; icon: React.ReactNode }) => {
+  return (
+    <div className="p-4 bg-card border rounded-lg shadow-md animate-in fade-in-50 duration-300">
+      <div className="flex items-start gap-3">
+        <div className="h-10 w-10 bg-eco-100 rounded-full flex items-center justify-center">
+          {icon}
+        </div>
+        <div>
+          <h4 className="font-medium text-lg">{title}</h4>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DashboardSectionCard = ({ 
+  title, 
+  shortDescription, 
+  icon, 
+  popoverTitle, 
+  popoverDescription,
+  isActive,
+  onClick 
+}: { 
+  title: string; 
+  shortDescription: string; 
+  icon: React.ReactNode; 
+  popoverTitle: string; 
+  popoverDescription: string;
+  isActive: boolean;
+  onClick: () => void;
+}) => {
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <Card 
+          className={`cursor-pointer transition-all duration-300 hover:shadow-lg hover:translate-y-[-4px] ${isActive ? 'border-eco-500 shadow-lg shadow-eco-500/20' : ''}`}
+          onClick={onClick}
+        >
+          <CardContent className="p-6 flex items-start gap-4">
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${isActive ? 'bg-eco-500' : 'bg-secondary'}`}>
+              {React.cloneElement(icon as React.ReactElement, { 
+                className: `h-6 w-6 ${isActive ? 'text-white' : 'text-muted-foreground'}` 
+              })}
+            </div>
+            <div>
+              <h3 className="font-medium text-lg">{title}</h3>
+              <p className="text-sm text-muted-foreground">{shortDescription}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-80 p-0 animate-in fade-in-50 zoom-in-95">
+        <FeatureInfoPopup 
+          title={popoverTitle} 
+          description={popoverDescription}
+          icon={icon}
+        />
+      </HoverCardContent>
+    </HoverCard>
+  );
+};
+
 const DriverDashboard = () => {
   const [activeBin, setActiveBin] = useState<number | null>(null);
+  const [activeFeature, setActiveFeature] = useState<string>("map");
   const { toast } = useToast();
 
   const handleCollectBin = (binId: number) => {
@@ -120,6 +187,39 @@ const DriverDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="grid grid-cols-1 gap-6 mb-8">
+        <h2 className="text-2xl font-bold">Driver Dashboard</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <DashboardSectionCard
+            title="Map View"
+            shortDescription="View bin locations"
+            icon={<Map className="text-eco-600" />}
+            popoverTitle="Interactive Map View"
+            popoverDescription="Access a detailed map showing all bin locations. Get optimized routes to efficiently collect from multiple bins in an area."
+            isActive={activeFeature === "map"}
+            onClick={() => setActiveFeature("map")}
+          />
+          <DashboardSectionCard
+            title="Waste Level Indicator"
+            shortDescription="Track bin fill levels"
+            icon={<BatteryMedium className="text-eco-600" />}
+            popoverTitle="Real-Time Waste Levels"
+            popoverDescription="Monitor bin fill levels in real-time to prioritize collections based on urgency. Bins are color-coded by fill status."
+            isActive={activeFeature === "levels"}
+            onClick={() => setActiveFeature("levels")}
+          />
+          <DashboardSectionCard
+            title="User Interface"
+            shortDescription="Easy navigation controls"
+            icon={<User className="text-eco-600" />}
+            popoverTitle="User-Friendly Controls"
+            popoverDescription="Intuitive controls make it easy to navigate the map, select bins, and view waste levels. All functions are accessible with minimal clicks."
+            isActive={activeFeature === "interface"}
+            onClick={() => setActiveFeature("interface")}
+          />
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row gap-8">
         <div className="w-full md:w-1/4">
           <Card>
@@ -195,7 +295,25 @@ const DriverDashboard = () => {
             <TabsContent value="map" className="mt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Bin Locations</CardTitle>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Bin Locations</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-8 w-8 rounded-full">
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold">Interactive Map</h4>
+                          <p className="text-sm text-muted-foreground">
+                            This map shows all bin locations in your area. Click on a pin to see bin details.
+                            The system automatically provides optimized routes covering all bins efficiently.
+                          </p>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </CardTitle>
                   <CardDescription>Real-time map of all bins in your area</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -247,7 +365,25 @@ const DriverDashboard = () => {
             <TabsContent value="list" className="mt-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Bins Status</CardTitle>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Bins Status</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-8 w-8 rounded-full">
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold">Bin Status List</h4>
+                          <p className="text-sm text-muted-foreground">
+                            This list shows all bins with their current fill levels, sorted by priority.
+                            Click on a bin to see more details or click 'Collect' to add it to your route.
+                          </p>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </CardTitle>
                   <CardDescription>Current fill level and status of all bins</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -274,7 +410,10 @@ const DriverDashboard = () => {
                               size="sm" 
                               variant={bin.fillLevel > 75 ? "default" : "outline"} 
                               className="mt-2 md:mt-0"
-                              onClick={() => handleCollectBin(bin.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCollectBin(bin.id);
+                              }}
                             >
                               <Truck className="h-4 w-4 mr-1" />
                               Collect
@@ -301,7 +440,25 @@ const DriverDashboard = () => {
           
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Today's Collection Route</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Today's Collection Route</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-full">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold">Optimized Route</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Your route is continually optimized based on bin fill levels, traffic conditions, and priority areas.
+                        The system ensures you cover all high-priority bins with the shortest possible distance.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
               <CardDescription className="flex items-center">
                 <CalendarDays className="h-4 w-4 mr-2" />
                 <span>April 20, 2023</span>
