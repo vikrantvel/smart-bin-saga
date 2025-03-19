@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -9,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Map, Truck, MapPin, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info } from 'lucide-react';
+import { Map as MapIcon, Truck, MapPin, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 
 const binsData = [
   { id: 1, location: 'Main Street #103', lat: 40.7128, lng: -74.006, fillLevel: 85, lastCollected: '2023-04-10', binType: 'General Waste' },
@@ -22,6 +22,26 @@ const binsData = [
   { id: 5, location: 'Central Park #76', lat: 40.7736, lng: -73.9712, fillLevel: 20, lastCollected: '2023-04-18', binType: 'Recycling' },
   { id: 6, location: 'Oak Street #113', lat: 40.7264, lng: -74.0094, fillLevel: 65, lastCollected: '2023-04-14', binType: 'General Waste' },
 ];
+
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%'
+};
+
+const center = {
+  lat: 40.73,
+  lng: -73.99
+};
+
+const getBinMarkerIcon = (fillLevel) => {
+  if (fillLevel >= 75) {
+    return { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' };
+  } else if (fillLevel >= 40) {
+    return { url: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png' };
+  } else {
+    return { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' };
+  }
+};
 
 const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
   const [email, setEmail] = useState('');
@@ -151,14 +171,14 @@ const DashboardSectionCard = ({
           onClick={onClick}
         >
           <CardContent className="p-6 flex items-start gap-4">
-            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${isActive ? 'bg-eco-500' : 'bg-secondary'}`}>
+            <div className={`h-12 w-12 rounded-full ${isActive ? 'bg-eco-500' : 'bg-secondary'}`}>
               {React.cloneElement(icon as React.ReactElement, { 
                 className: `h-6 w-6 ${isActive ? 'text-white' : 'text-muted-foreground'}` 
               })}
             </div>
             <div>
               <h3 className="font-medium text-lg">{title}</h3>
-              <p className="text-sm text-muted-foreground">{shortDescription}</p>
+              <p className="text-muted-foreground">{shortDescription}</p>
             </div>
           </CardContent>
         </Card>
@@ -171,6 +191,61 @@ const DashboardSectionCard = ({
         />
       </HoverCardContent>
     </HoverCard>
+  );
+};
+
+const GoogleMapComponent = () => {
+  const [selectedBin, setSelectedBin] = useState<null | typeof binsData[0]>(null);
+  
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: 'AIzaSyCbz8lwBmWJXZsLZuYyylD8T3cqatpIGb0'
+  });
+
+  const onMarkerClick = (bin: typeof binsData[0]) => {
+    setSelectedBin(bin);
+  };
+
+  const onInfoWindowClose = () => {
+    setSelectedBin(null);
+  };
+
+  return isLoaded ? (
+    <div className="w-full h-full" style={{ minHeight: '400px' }}>
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={center}
+        zoom={13}
+      >
+        {binsData.map(bin => (
+          <Marker
+            key={bin.id}
+            position={{ lat: bin.lat, lng: bin.lng }}
+            onClick={() => onMarkerClick(bin)}
+            icon={getBinMarkerIcon(bin.fillLevel)}
+            title={bin.location}
+          />
+        ))}
+        
+        {selectedBin && (
+          <InfoWindow
+            position={{ lat: selectedBin.lat, lng: selectedBin.lng }}
+            onCloseClick={onInfoWindowClose}
+          >
+            <div className="p-2">
+              <p className="font-semibold">{selectedBin.location}</p>
+              <p className="text-sm">Fill Level: {selectedBin.fillLevel}%</p>
+              <p className="text-sm">Type: {selectedBin.binType}</p>
+              <p className="text-sm">Last Collected: {selectedBin.lastCollected}</p>
+            </div>
+          </InfoWindow>
+        )}
+      </GoogleMap>
+    </div>
+  ) : (
+    <div className="w-full h-80 flex items-center justify-center bg-secondary rounded-md">
+      <p>Loading Map...</p>
+    </div>
   );
 };
 
@@ -194,7 +269,7 @@ const DriverDashboard = () => {
           <DashboardSectionCard
             title="Map View"
             shortDescription="View bin locations"
-            icon={<Map className="text-eco-600" />}
+            icon={<MapIcon className="text-eco-600" />}
             popoverTitle="Interactive Map View"
             popoverDescription="Access a detailed map showing all bin locations. Get optimized routes to efficiently collect from multiple bins in an area."
             isActive={activeFeature === "map"}
@@ -306,9 +381,9 @@ const DriverDashboard = () => {
                       </PopoverTrigger>
                       <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
                         <div className="space-y-2">
-                          <h4 className="font-semibold">Interactive Map</h4>
+                          <h4 className="font-semibold">Interactive Google Map</h4>
                           <p className="text-sm text-muted-foreground">
-                            This map shows all bin locations in your area. Click on a pin to see bin details.
+                            This map shows all bin locations in your area. Click on a marker to see bin details.
                             The system automatically provides optimized routes covering all bins efficiently.
                           </p>
                         </div>
@@ -318,31 +393,8 @@ const DriverDashboard = () => {
                   <CardDescription>Real-time map of all bins in your area</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="aspect-[16/9] bg-background rounded-md border overflow-hidden relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Map className="h-12 w-12 text-muted-foreground animate-pulse" />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900/40 to-slate-900/40 flex items-center justify-center">
-                      <p className="text-white text-lg font-semibold">Interactive Map View</p>
-                    </div>
-                    
-                    <div className="absolute top-1/4 left-1/3 animate-pulse-slow">
-                      <div className="relative">
-                        <MapPin className="h-6 w-6 text-waste-high" />
-                        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-card p-2 rounded shadow-lg whitespace-nowrap">
-                          <p className="text-xs font-medium">Main Street #103</p>
-                          <p className="text-xs text-muted-foreground">85% Full</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="absolute top-1/2 left-2/3 animate-pulse-slow" style={{ animationDelay: "1s" }}>
-                      <MapPin className="h-6 w-6 text-waste-medium" />
-                    </div>
-                    
-                    <div className="absolute bottom-1/3 right-1/4 animate-pulse-slow" style={{ animationDelay: "1.5s" }}>
-                      <MapPin className="h-6 w-6 text-waste-low" />
-                    </div>
+                  <div className="aspect-[16/9] rounded-md border overflow-hidden relative">
+                    <GoogleMapComponent />
                   </div>
                   
                   <div className="mt-6 flex flex-wrap gap-4">
@@ -531,7 +583,7 @@ const BinAttenders = () => {
                     <ul className="space-y-3">
                       <li className="flex items-start">
                         <div className="mt-1 bg-eco-100 rounded-full p-1 mr-2">
-                          <Map className="h-4 w-4 text-eco-600" />
+                          <MapIcon className="h-4 w-4 text-eco-600" />
                         </div>
                         <div>
                           <h4 className="font-medium">Smart Navigation</h4>
@@ -586,3 +638,4 @@ const BinAttenders = () => {
 };
 
 export default BinAttenders;
+
