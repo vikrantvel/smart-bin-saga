@@ -547,7 +547,7 @@ const DriverDashboard = () => {
                 </div>
                 
                 <Button className="w-full">
-                  <Map className="h-4 w-4 mr-2" />
+                  <MapIcon className="h-4 w-4 mr-2" />
                   View Complete Route
                 </Button>
               </div>
@@ -638,4 +638,3 @@ const BinAttenders = () => {
 };
 
 export default BinAttenders;
-
