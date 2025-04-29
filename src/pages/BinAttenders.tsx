@@ -8,7 +8,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Navigation, Route as RouteIcon, Car, Map, ArrowRight } from 'lucide-react';
+import { 
+  MapPin, 
+  Navigation, 
+  Route as RouteIcon, 
+  Car, 
+  Map, 
+  ArrowRight,
+  User,
+  Info,
+  Clock,
+  Truck,
+  BatteryFull,
+  BatteryMedium,
+  BatteryLow 
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
