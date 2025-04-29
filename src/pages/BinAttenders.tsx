@@ -8,12 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Truck, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info, Route } from 'lucide-react';
+import { MapPin, Truck, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info, Route as RouteIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
-import { solveTSP } from '@/utils/tspSolver';
+import { solveTSP, calculateTotalDistance, DEPOT } from '@/utils/tspSolver';
 
 // Updated bin locations with the coordinates provided
 const binsData = [
@@ -24,15 +24,18 @@ const binsData = [
   { id: 5, location: 'Alwarpet', lat: 13.06, lng: 80.21, fillLevel: 20, lastCollected: '2023-04-18', binType: 'Recycling' },
 ];
 
+// All locations including the depot
+const allLocations = [DEPOT, ...binsData];
+
 const mapContainerStyle = {
   width: '100%',
   height: '100%'
 };
 
-// Updated center for Chennai area
+// Updated center for Chennai area with Tambaram included
 const center = {
-  lat: 13.0475,
-  lng: 80.2089
+  lat: 13.0000,
+  lng: 80.1500
 };
 
 // Get bin marker icon based on fill level
@@ -44,6 +47,14 @@ const getBinMarkerIcon = (fillLevel) => {
   } else {
     return { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' };
   }
+};
+
+// Get depot marker icon - different from bin markers
+const getDepotMarkerIcon = () => {
+  return { 
+    url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+    scaledSize: { width: 40, height: 40 }
+  };
 };
 
 const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
@@ -198,7 +209,7 @@ const DashboardSectionCard = ({
 };
 
 const GoogleMapComponent = () => {
-  const [selectedBin, setSelectedBin] = useState<null | typeof binsData[0]>(null);
+  const [selectedLocation, setSelectedLocation] = useState<null | (typeof binsData[0] | typeof DEPOT)>(null);
   const [optimizedRoute, setOptimizedRoute] = useState<number[]>([]);
   
   const { isLoaded } = useJsApiLoader({
@@ -206,12 +217,12 @@ const GoogleMapComponent = () => {
     googleMapsApiKey: 'AIzaSyCbz8lwBmWJXZsLZuYyylD8T3cqatpIGb0'
   });
 
-  const onMarkerClick = (bin: typeof binsData[0]) => {
-    setSelectedBin(bin);
+  const onMarkerClick = (location: typeof binsData[0] | typeof DEPOT) => {
+    setSelectedLocation(location);
   };
 
   const onInfoWindowClose = () => {
-    setSelectedBin(null);
+    setSelectedLocation(null);
   };
 
   // Calculate optimized route using TSP
@@ -228,18 +239,10 @@ const GoogleMapComponent = () => {
     if (!optimizedRoute.length) return [];
     
     const path = [];
-    for (const binId of optimizedRoute) {
-      const bin = binsData.find(b => b.id === binId);
-      if (bin) {
-        path.push({ lat: bin.lat, lng: bin.lng });
-      }
-    }
-    
-    // Close the loop
-    if (path.length > 0 && optimizedRoute.length > 0) {
-      const firstBin = binsData.find(b => b.id === optimizedRoute[0]);
-      if (firstBin) {
-        path.push({ lat: firstBin.lat, lng: firstBin.lng });
+    for (const locationId of optimizedRoute) {
+      const location = allLocations.find(l => l.id === locationId);
+      if (location) {
+        path.push({ lat: location.lat, lng: location.lng });
       }
     }
     
@@ -253,6 +256,15 @@ const GoogleMapComponent = () => {
         center={center}
         zoom={11}
       >
+        {/* Render depot marker */}
+        <Marker
+          position={{ lat: DEPOT.lat, lng: DEPOT.lng }}
+          onClick={() => onMarkerClick(DEPOT)}
+          icon={getDepotMarkerIcon()}
+          title={DEPOT.location}
+          label="D"
+        />
+
         {/* Render bin markers */}
         {binsData.map(bin => (
           <Marker
@@ -276,16 +288,22 @@ const GoogleMapComponent = () => {
           }}
         />
         
-        {selectedBin && (
+        {selectedLocation && (
           <InfoWindow
-            position={{ lat: selectedBin.lat, lng: selectedBin.lng }}
+            position={{ lat: selectedLocation.lat, lng: selectedLocation.lng }}
             onCloseClick={onInfoWindowClose}
           >
             <div className="p-2">
-              <p className="font-semibold">{selectedBin.location}</p>
-              <p className="text-sm">Fill Level: {selectedBin.fillLevel}%</p>
-              <p className="text-sm">Type: {selectedBin.binType}</p>
-              <p className="text-sm">Last Collected: {selectedBin.lastCollected}</p>
+              <p className="font-semibold">{selectedLocation.location}</p>
+              {'fillLevel' in selectedLocation ? (
+                <>
+                  <p className="text-sm">Fill Level: {selectedLocation.fillLevel}%</p>
+                  <p className="text-sm">Type: {selectedLocation.binType}</p>
+                  <p className="text-sm">Last Collected: {selectedLocation.lastCollected}</p>
+                </>
+              ) : (
+                <p className="text-sm text-blue-600 font-medium">Depot Location</p>
+              )}
             </div>
           </InfoWindow>
         )}
@@ -301,40 +319,33 @@ const GoogleMapComponent = () => {
 const OptimizedRouteInfo = ({ optimizedRoute }: { optimizedRoute: number[] }) => {
   if (!optimizedRoute.length) return null;
   
-  // Calculate total distance
-  const calculateTotalDistance = () => {
-    let totalDistance = 0;
-    for (let i = 0; i < optimizedRoute.length - 1; i++) {
-      const currentBin = binsData.find(b => b.id === optimizedRoute[i]);
-      const nextBin = binsData.find(b => b.id === optimizedRoute[i + 1]);
-      
-      if (currentBin && nextBin) {
-        const distance = Math.sqrt(
-          Math.pow(nextBin.lat - currentBin.lat, 2) + 
-          Math.pow(nextBin.lng - currentBin.lng, 2)
-        ) * 111; // Rough conversion to kilometers
-        totalDistance += distance;
-      }
-    }
-    return totalDistance.toFixed(2);
-  };
+  // Calculate total distance using the utility function
+  const totalDistance = calculateTotalDistance(optimizedRoute, allLocations);
   
   return (
     <div className="p-4 bg-secondary/50 rounded-lg">
       <h3 className="font-medium mb-2 flex items-center">
-        <Route className="h-4 w-4 mr-2" /> 
+        <RouteIcon className="h-4 w-4 mr-2" /> 
         Optimized Route Information
       </h3>
-      <p className="text-sm text-muted-foreground mb-2">
-        Using Travelling Salesman Problem algorithm to find shortest route between bins.
-      </p>
+      <div className="text-sm text-muted-foreground mb-2">
+        <p>Route starts and ends at the <span className="font-semibold">{DEPOT.location} Depot</span></p>
+        <p>Using Travelling Salesman Problem algorithm to find shortest route between bins.</p>
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {optimizedRoute.map((binId, index) => {
-          const bin = binsData.find(b => b.id === binId);
+        {optimizedRoute.map((locationId, index) => {
+          const location = allLocations.find(l => l.id === locationId);
+          const isDepot = locationId === DEPOT.id;
+          
+          if (!location) return null;
+          
           return (
             <div key={index} className="flex items-center">
-              <Badge variant="outline" className="bg-eco-100">
-                {bin?.location}
+              <Badge 
+                variant="outline" 
+                className={isDepot ? "bg-blue-100" : "bg-eco-100"}
+              >
+                {location.location}{isDepot ? " (Depot)" : ""}
               </Badge>
               {index < optimizedRoute.length - 1 && (
                 <span className="px-1">→</span>
@@ -344,7 +355,7 @@ const OptimizedRouteInfo = ({ optimizedRoute }: { optimizedRoute: number[] }) =>
         })}
       </div>
       <div className="mt-3 text-sm">
-        Total route distance: <span className="font-semibold">{calculateTotalDistance()} km</span>
+        Total route distance: <span className="font-semibold">{totalDistance.toFixed(2)} km</span>
       </div>
     </div>
   );
@@ -638,7 +649,7 @@ const DriverDashboard = () => {
               <div className="space-y-4">
                 <div className="p-4 bg-secondary/50 rounded-lg">
                   <h3 className="font-medium mb-2 flex items-center">
-                    <Route className="h-4 w-4 mr-2" /> 
+                    <RouteIcon className="h-4 w-4 mr-2" /> 
                     TSP Route Optimization Active
                   </h3>
                   <p className="text-sm text-muted-foreground">

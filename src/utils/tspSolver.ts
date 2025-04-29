@@ -1,6 +1,7 @@
 
 /**
  * Travelling Salesman Problem (TSP) solver using a greedy nearest neighbor approach
+ * with a fixed depot as start and end location
  */
 
 // Calculate distance between two points using the Haversine formula (for geographic coordinates)
@@ -30,43 +31,85 @@ export const dmsToDecimal = (degrees: number, minutes: number, seconds: number, 
   return decimal;
 };
 
-// TSP solver using greedy nearest neighbor algorithm
+// Depot location - Tambaram
+export const DEPOT = {
+  id: 0,
+  location: 'Tambaram',
+  lat: 12.9249,
+  lng: 80.1000
+};
+
+// TSP solver using greedy nearest neighbor algorithm with fixed start/end at depot
 export const solveTSP = (bins: { id: number; lat: number; lng: number }[]): number[] => {
-  if (bins.length <= 1) return bins.map(bin => bin.id);
+  if (bins.length === 0) return [DEPOT.id];
+  if (bins.length === 1) return [DEPOT.id, bins[0].id, DEPOT.id];
   
-  const visited: boolean[] = Array(bins.length).fill(false);
+  // Create a combined array with depot and bins
+  const allLocations = [DEPOT, ...bins];
+  const n = allLocations.length;
+  
+  const visited: boolean[] = Array(n).fill(false);
   const tour: number[] = [];
   
-  // Start with the first bin
-  let currentBinIndex = 0;
-  tour.push(bins[currentBinIndex].id);
-  visited[currentBinIndex] = true;
+  // Start with depot (index 0)
+  let currentLocationIndex = 0;
+  tour.push(allLocations[currentLocationIndex].id);
+  visited[currentLocationIndex] = true;
   
-  // Find nearest neighbor until all bins are visited
-  while (tour.length < bins.length) {
-    let nearestBinIndex = -1;
+  // Find nearest unvisited location until all locations are visited
+  while (tour.length < n) {
+    let nearestLocationIndex = -1;
     let shortestDistance = Infinity;
     
-    for (let i = 0; i < bins.length; i++) {
+    for (let i = 0; i < n; i++) {
       if (!visited[i]) {
         const distance = calculateDistance(
-          bins[currentBinIndex].lat, bins[currentBinIndex].lng,
-          bins[i].lat, bins[i].lng
+          allLocations[currentLocationIndex].lat, allLocations[currentLocationIndex].lng,
+          allLocations[i].lat, allLocations[i].lng
         );
         
         if (distance < shortestDistance) {
           shortestDistance = distance;
-          nearestBinIndex = i;
+          nearestLocationIndex = i;
         }
       }
     }
     
-    if (nearestBinIndex !== -1) {
-      currentBinIndex = nearestBinIndex;
-      tour.push(bins[currentBinIndex].id);
-      visited[currentBinIndex] = true;
+    if (nearestLocationIndex !== -1) {
+      currentLocationIndex = nearestLocationIndex;
+      tour.push(allLocations[currentLocationIndex].id);
+      visited[currentLocationIndex] = true;
     }
   }
   
+  // Add depot as the final location to return to
+  tour.push(DEPOT.id);
+  
   return tour;
+};
+
+// Calculate the total distance of a tour
+export const calculateTotalDistance = (
+  tour: number[], 
+  locations: { id: number; lat: number; lng: number }[]
+): number => {
+  let totalDistance = 0;
+  
+  for (let i = 0; i < tour.length - 1; i++) {
+    const currentId = tour[i];
+    const nextId = tour[i + 1];
+    
+    const currentLocation = locations.find(loc => loc.id === currentId);
+    const nextLocation = locations.find(loc => loc.id === nextId);
+    
+    if (currentLocation && nextLocation) {
+      const distance = calculateDistance(
+        currentLocation.lat, currentLocation.lng,
+        nextLocation.lat, nextLocation.lng
+      );
+      totalDistance += distance;
+    }
+  }
+  
+  return totalDistance;
 };
