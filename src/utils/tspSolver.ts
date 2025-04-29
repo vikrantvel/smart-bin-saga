@@ -113,3 +113,68 @@ export const calculateTotalDistance = (
   
   return totalDistance;
 };
+
+// Get basic driving directions between two points based on cardinal directions
+export const getBasicDirections = (from: { lat: number; lng: number; location: string }, to: { lat: number; lng: number; location: string }): string[] => {
+  const directions: string[] = [];
+  
+  // Calculate the overall direction
+  const latDiff = to.lat - from.lat;
+  const lngDiff = to.lng - from.lng;
+  
+  // Get direction string
+  let latDirection = latDiff > 0 ? "north" : "south";
+  let lngDirection = lngDiff > 0 ? "east" : "west";
+  
+  // Starting instruction
+  directions.push(`Start from ${from.location}.`);
+  
+  // Main travel direction
+  directions.push(`Head ${latDirection}${lngDiff !== 0 ? "-" + lngDirection : ""} towards ${to.location}.`);
+  
+  // Distance calculation
+  const distance = calculateDistance(from.lat, from.lng, to.lat, to.lng);
+  directions.push(`Continue for approximately ${distance.toFixed(2)} km.`);
+  
+  // Arrival instruction
+  directions.push(`Arrive at ${to.location}.`);
+  
+  return directions;
+};
+
+// Generate route legs with locations, distances, and estimated times
+export const generateRouteLegDetails = (tour: number[], allLocations: { id: number; lat: number; lng: number; location: string }[]) => {
+  if (tour.length <= 1) return [];
+  
+  const legs = [];
+  
+  for (let i = 0; i < tour.length - 1; i++) {
+    const currentLocationId = tour[i];
+    const nextLocationId = tour[i + 1];
+    
+    const currentLocation = allLocations.find(loc => loc.id === currentLocationId);
+    const nextLocation = allLocations.find(loc => loc.id === nextLocationId);
+    
+    if (currentLocation && nextLocation) {
+      const distance = calculateDistance(
+        currentLocation.lat, currentLocation.lng, 
+        nextLocation.lat, nextLocation.lng
+      );
+      
+      // Assuming an average speed of 40 km/h in urban areas
+      const timeMinutes = (distance / 40) * 60;
+      
+      legs.push({
+        from: currentLocation.location,
+        to: nextLocation.location,
+        fromCoords: { lat: currentLocation.lat, lng: currentLocation.lng },
+        toCoords: { lat: nextLocation.lat, lng: nextLocation.lng },
+        distance: distance.toFixed(2),
+        time: timeMinutes.toFixed(0),
+        directions: getBasicDirections(currentLocation, nextLocation)
+      });
+    }
+  }
+  
+  return legs;
+};

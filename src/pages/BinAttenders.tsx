@@ -8,12 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Truck, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info, Route as RouteIcon } from 'lucide-react';
+import { MapPin, Navigation, Route as RouteIcon, Car, Map, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
-import { solveTSP, calculateTotalDistance, DEPOT } from '@/utils/tspSolver';
+import { solveTSP, calculateTotalDistance, DEPOT, generateRouteLegDetails } from '@/utils/tspSolver';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 // Updated bin locations with the coordinates provided
 const binsData = [
@@ -52,8 +53,7 @@ const getBinMarkerIcon = (fillLevel) => {
 // Get depot marker icon - different from bin markers
 const getDepotMarkerIcon = () => {
   return { 
-    url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-    scaledSize: { width: 40, height: 40 }
+    url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
   };
 };
 
@@ -254,7 +254,13 @@ const GoogleMapComponent = () => {
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={center}
-        zoom={11}
+        zoom={10}
+        options={{
+          mapTypeControl: true,
+          zoomControl: true,
+          fullscreenControl: true,
+          streetViewControl: true
+        }}
       >
         {/* Render depot marker */}
         <Marker
@@ -313,6 +319,98 @@ const GoogleMapComponent = () => {
     <div className="w-full h-80 flex items-center justify-center bg-secondary rounded-md">
       <p>Loading Map...</p>
     </div>
+  );
+};
+
+const RouteDirectionsComponent = ({ optimizedRoute }) => {
+  const [directionsData, setDirectionsData] = useState([]);
+  const [totalTripDistance, setTotalTripDistance] = useState(0);
+  const [totalTripTime, setTotalTripTime] = useState(0);
+  
+  useEffect(() => {
+    if (optimizedRoute.length > 0) {
+      const legDetails = generateRouteLegDetails(optimizedRoute, allLocations);
+      setDirectionsData(legDetails);
+      
+      // Calculate total trip distance and time
+      const totalDistance = legDetails.reduce((sum, leg) => sum + parseFloat(leg.distance), 0);
+      const totalTime = legDetails.reduce((sum, leg) => sum + parseInt(leg.time), 0);
+      
+      setTotalTripDistance(totalDistance);
+      setTotalTripTime(totalTime);
+    }
+  }, [optimizedRoute]);
+
+  if (!directionsData.length) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Car className="h-5 w-5 mr-2" />
+          Turn-by-Turn Directions
+        </CardTitle>
+        <CardDescription>
+          Total trip distance: {totalTripDistance.toFixed(2)} km | Estimated time: {Math.floor(totalTripTime / 60)}h {totalTripTime % 60}min
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Accordion type="single" collapsible className="w-full">
+          {directionsData.map((leg, index) => (
+            <AccordionItem value={`leg-${index}`} key={`leg-${index}`}>
+              <AccordionTrigger className="hover:bg-secondary/50 px-4 py-2 rounded-md">
+                <div className="flex items-center w-full justify-between pr-4">
+                  <div className="flex items-center">
+                    <Badge className="mr-2">{index + 1}</Badge>
+                    <span>{leg.from} <ArrowRight className="h-4 w-4 inline mx-1" /> {leg.to}</span>
+                  </div>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <span className="mr-2">{leg.distance} km</span>
+                    <span>{leg.time} min</span>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="border-l-2 border-secondary ml-4 pl-4">
+                <div className="space-y-2 py-2">
+                  {leg.directions.map((direction, dirIndex) => (
+                    <div key={`dir-${index}-${dirIndex}`} className="flex items-start">
+                      <div className="bg-secondary h-6 w-6 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-xs font-medium">{dirIndex + 1}</span>
+                      </div>
+                      <p>{direction}</p>
+                    </div>
+                  ))}
+                  <div className="px-2 py-4 bg-secondary/30 rounded-md mt-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-medium">Coordinates:</p>
+                        <p className="text-xs">From: {leg.fromCoords.lat.toFixed(4)}°N, {leg.fromCoords.lng.toFixed(4)}°E</p>
+                        <p className="text-xs">To: {leg.toCoords.lat.toFixed(4)}°N, {leg.toCoords.lng.toFixed(4)}°E</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">Distance: {leg.distance} km</p>
+                        <p className="text-sm">Est. time: {leg.time} min</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+
+        <div className="mt-6 flex justify-between items-center">
+          <Button variant="outline" className="w-1/2 sm:w-auto">
+            <Map className="h-4 w-4 mr-2" />
+            View on Google Maps
+          </Button>
+          <Button className="w-1/2 sm:w-auto">
+            <Navigation className="h-4 w-4 mr-2" />
+            Start Navigation
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -397,22 +495,22 @@ const DriverDashboard = () => {
             onClick={() => setActiveFeature("map")}
           />
           <DashboardSectionCard
-            title="Waste Level Indicator"
-            shortDescription="Track bin fill levels"
-            icon={<BatteryMedium className="text-eco-600" />}
-            popoverTitle="Real-Time Waste Levels"
-            popoverDescription="Monitor bin fill levels in real-time to prioritize collections based on urgency. Bins are color-coded by fill status."
-            isActive={activeFeature === "levels"}
-            onClick={() => setActiveFeature("levels")}
+            title="Route Directions"
+            shortDescription="Turn-by-turn navigation"
+            icon={<Navigation className="text-eco-600" />}
+            popoverTitle="Route Directions"
+            popoverDescription="Get detailed turn-by-turn directions for the optimized route between all bins. Includes distance and time estimates."
+            isActive={activeFeature === "directions"}
+            onClick={() => setActiveFeature("directions")}
           />
           <DashboardSectionCard
-            title="User Interface"
-            shortDescription="Easy navigation controls"
-            icon={<User className="text-eco-600" />}
-            popoverTitle="User-Friendly Controls"
-            popoverDescription="Intuitive controls make it easy to navigate the map, select bins, and view waste levels. All functions are accessible with minimal clicks."
-            isActive={activeFeature === "interface"}
-            onClick={() => setActiveFeature("interface")}
+            title="Fuel Efficiency"
+            shortDescription="Optimize fuel consumption"
+            icon={<Car className="text-eco-600" />}
+            popoverTitle="Fuel-Efficient Routing"
+            popoverDescription="The route is optimized to minimize total distance traveled, helping to reduce fuel consumption and emissions."
+            isActive={activeFeature === "fuel"}
+            onClick={() => setActiveFeature("fuel")}
           />
         </div>
       </div>
@@ -484,8 +582,9 @@ const DriverDashboard = () => {
         
         <div className="w-full md:w-3/4">
           <Tabs defaultValue="map">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="map">Map View</TabsTrigger>
+              <TabsTrigger value="directions">Directions</TabsTrigger>
               <TabsTrigger value="list">List View</TabsTrigger>
             </TabsList>
             
@@ -497,7 +596,7 @@ const DriverDashboard = () => {
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="icon" className="h-8 w-8 rounded-full">
-                          <Info className="h-4 w-4" />
+                          <RouteIcon className="h-4 w-4" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
@@ -538,6 +637,10 @@ const DriverDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+            
+            <TabsContent value="directions" className="mt-4">
+              <RouteDirectionsComponent optimizedRoute={optimizedRoute} />
             </TabsContent>
             
             <TabsContent value="list" className="mt-4">
@@ -622,88 +725,80 @@ const DriverDashboard = () => {
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Today's Collection Route</span>
+                <span>Fuel-Efficient Route</span>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="h-8 w-8 rounded-full">
-                      <Info className="h-4 w-4" />
+                      <Car className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
                     <div className="space-y-2">
-                      <h4 className="font-semibold">TSP Optimized Route</h4>
+                      <h4 className="font-semibold">Fuel Optimization</h4>
                       <p className="text-sm text-muted-foreground">
-                        Your route is optimized using the Travelling Salesman Problem algorithm to find the shortest possible path
-                        visiting all bins exactly once and returning to the start. This minimizes fuel consumption and travel time.
+                        The route is optimized to minimize the total distance traveled, which helps reduce fuel consumption.
+                        The TSP algorithm ensures that the driver visits all locations once before returning to the depot.
                       </p>
                     </div>
                   </PopoverContent>
                 </Popover>
               </CardTitle>
-              <CardDescription className="flex items-center">
-                <CalendarDays className="h-4 w-4 mr-2" />
-                <span>April 20, 2023</span>
-              </CardDescription>
+              <CardDescription>Details about fuel efficiency and route optimization</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="p-4 bg-secondary/50 rounded-lg">
                   <h3 className="font-medium mb-2 flex items-center">
-                    <RouteIcon className="h-4 w-4 mr-2" /> 
-                    TSP Route Optimization Active
+                    <Car className="h-4 w-4 mr-2" /> 
+                    Fuel-Efficient Routing Active
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Your route is optimized using the Travelling Salesman Problem algorithm to minimize the total distance traveled.
+                    Your route minimizes total distance, helping to reduce fuel consumption and carbon emissions.
                   </p>
                 </div>
-                
+
                 {optimizedRoute.length > 0 && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 border rounded-lg">
-                      <h4 className="text-sm font-medium mb-1">Next Collection</h4>
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 text-waste-high mr-1" />
-                        <span className="text-sm">{
-                          binsData.find(bin => bin.id === optimizedRoute[0])?.location || "Unknown"
-                        }</span>
-                      </div>
+                      <h4 className="text-sm font-medium mb-1">Total Route Distance</h4>
+                      <p className="text-lg font-medium">
+                        {calculateTotalDistance(optimizedRoute, allLocations).toFixed(2)} km
+                      </p>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        Estimated arrival: 10 minutes
+                        Optimized for minimum distance traveled
                       </div>
                     </div>
                     <div className="p-4 border rounded-lg">
-                      <h4 className="text-sm font-medium mb-1">Total Route Distance</h4>
-                      {optimizedRoute.length > 0 && (
-                        <p className="text-lg font-medium">
-                          {(() => {
-                            let totalDistance = 0;
-                            for (let i = 0; i < optimizedRoute.length - 1; i++) {
-                              const currentBin = binsData.find(b => b.id === optimizedRoute[i]);
-                              const nextBin = binsData.find(b => b.id === optimizedRoute[i + 1]);
-                              
-                              if (currentBin && nextBin) {
-                                const distance = Math.sqrt(
-                                  Math.pow(nextBin.lat - currentBin.lat, 2) + 
-                                  Math.pow(nextBin.lng - currentBin.lng, 2)
-                                ) * 111; // Rough conversion to kilometers
-                                totalDistance += distance;
-                              }
-                            }
-                            return totalDistance.toFixed(2) + " km";
-                          })()}
-                        </p>
-                      )}
+                      <h4 className="text-sm font-medium mb-1">Estimated Fuel Savings</h4>
+                      <p className="text-lg font-medium text-green-600">
+                        {(calculateTotalDistance(optimizedRoute, allLocations) * 0.05).toFixed(2)} liters
+                      </p>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        Estimated completion: 3:30 PM
+                        Compared to non-optimized route (estimated)
                       </div>
                     </div>
                   </div>
                 )}
                 
-                <Button className="w-full">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  View Complete Route
-                </Button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="text-sm font-medium mb-1">Eco Tips</h4>
+                    <ul className="text-sm space-y-1 mt-2">
+                      <li>• Maintain steady speed for better fuel economy</li>
+                      <li>• Avoid rapid acceleration and braking</li>
+                      <li>• Follow the optimized route sequence</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="text-sm font-medium mb-1">CO₂ Reduction</h4>
+                    <p className="text-lg font-medium text-green-600">
+                      {(calculateTotalDistance(optimizedRoute, allLocations) * 0.12).toFixed(2)} kg
+                    </p>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Estimated CO₂ emissions saved with optimal routing
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
