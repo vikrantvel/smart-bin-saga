@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -8,19 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Map as MapIcon, Truck, MapPin, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info } from 'lucide-react';
+import { MapPin, Truck, BatteryFull, BatteryMedium, BatteryLow, Clock, CalendarDays, User, Info, Route } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
+import { solveTSP } from '@/utils/tspSolver';
 
+// Updated bin locations with the coordinates provided
 const binsData = [
-  { id: 1, location: 'Main Street #103', lat: 40.7128, lng: -74.006, fillLevel: 85, lastCollected: '2023-04-10', binType: 'General Waste' },
-  { id: 2, location: 'Park Avenue #87', lat: 40.7193, lng: -73.9916, fillLevel: 45, lastCollected: '2023-04-15', binType: 'Recycling' },
-  { id: 3, location: 'River Road #42', lat: 40.7232, lng: -74.0123, fillLevel: 30, lastCollected: '2023-04-17', binType: 'Organic' },
-  { id: 4, location: 'Downtown Plaza #29', lat: 40.7181, lng: -73.9973, fillLevel: 78, lastCollected: '2023-04-12', binType: 'General Waste' },
-  { id: 5, location: 'Central Park #76', lat: 40.7736, lng: -73.9712, fillLevel: 20, lastCollected: '2023-04-18', binType: 'Recycling' },
-  { id: 6, location: 'Oak Street #113', lat: 40.7264, lng: -74.0094, fillLevel: 65, lastCollected: '2023-04-14', binType: 'General Waste' },
+  { id: 1, location: 'Mylapore', lat: 13.035, lng: 80.2672, fillLevel: 85, lastCollected: '2023-04-10', binType: 'General Waste' },
+  { id: 2, location: 'Velachery', lat: 12.9697, lng: 80.1789, fillLevel: 45, lastCollected: '2023-04-15', binType: 'Recycling' },
+  { id: 3, location: 'Avadi', lat: 13.0950, lng: 80.1303, fillLevel: 30, lastCollected: '2023-04-17', binType: 'Organic' },
+  { id: 4, location: 'Mandaveli', lat: 13.035, lng: 80.2672, fillLevel: 78, lastCollected: '2023-04-12', binType: 'General Waste' },
+  { id: 5, location: 'Alwarpet', lat: 13.06, lng: 80.21, fillLevel: 20, lastCollected: '2023-04-18', binType: 'Recycling' },
 ];
 
 const mapContainerStyle = {
@@ -28,11 +29,13 @@ const mapContainerStyle = {
   height: '100%'
 };
 
+// Updated center for Chennai area
 const center = {
-  lat: 40.73,
-  lng: -73.99
+  lat: 13.0475,
+  lng: 80.2089
 };
 
+// Get bin marker icon based on fill level
 const getBinMarkerIcon = (fillLevel) => {
   if (fillLevel >= 75) {
     return { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' };
@@ -196,6 +199,7 @@ const DashboardSectionCard = ({
 
 const GoogleMapComponent = () => {
   const [selectedBin, setSelectedBin] = useState<null | typeof binsData[0]>(null);
+  const [optimizedRoute, setOptimizedRoute] = useState<number[]>([]);
   
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -210,13 +214,46 @@ const GoogleMapComponent = () => {
     setSelectedBin(null);
   };
 
+  // Calculate optimized route using TSP
+  useEffect(() => {
+    if (binsData.length > 0) {
+      const tour = solveTSP(binsData);
+      setOptimizedRoute(tour);
+      console.log("Optimized route:", tour);
+    }
+  }, []);
+
+  // Generate polyline path based on optimized route
+  const getPolylinePath = () => {
+    if (!optimizedRoute.length) return [];
+    
+    const path = [];
+    for (const binId of optimizedRoute) {
+      const bin = binsData.find(b => b.id === binId);
+      if (bin) {
+        path.push({ lat: bin.lat, lng: bin.lng });
+      }
+    }
+    
+    // Close the loop
+    if (path.length > 0 && optimizedRoute.length > 0) {
+      const firstBin = binsData.find(b => b.id === optimizedRoute[0]);
+      if (firstBin) {
+        path.push({ lat: firstBin.lat, lng: firstBin.lng });
+      }
+    }
+    
+    return path;
+  };
+
   return isLoaded ? (
     <div className="w-full h-full" style={{ minHeight: '400px' }}>
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={center}
-        zoom={13}
+        zoom={11}
       >
+        {/* Render bin markers */}
         {binsData.map(bin => (
           <Marker
             key={bin.id}
@@ -224,8 +261,20 @@ const GoogleMapComponent = () => {
             onClick={() => onMarkerClick(bin)}
             icon={getBinMarkerIcon(bin.fillLevel)}
             title={bin.location}
+            label={bin.id.toString()}
           />
         ))}
+        
+        {/* Render the optimized route */}
+        <Polyline
+          path={getPolylinePath()}
+          options={{
+            strokeColor: '#2563eb',
+            strokeOpacity: 0.8,
+            strokeWeight: 4,
+            geodesic: true,
+          }}
+        />
         
         {selectedBin && (
           <InfoWindow
@@ -249,10 +298,71 @@ const GoogleMapComponent = () => {
   );
 };
 
+const OptimizedRouteInfo = ({ optimizedRoute }: { optimizedRoute: number[] }) => {
+  if (!optimizedRoute.length) return null;
+  
+  // Calculate total distance
+  const calculateTotalDistance = () => {
+    let totalDistance = 0;
+    for (let i = 0; i < optimizedRoute.length - 1; i++) {
+      const currentBin = binsData.find(b => b.id === optimizedRoute[i]);
+      const nextBin = binsData.find(b => b.id === optimizedRoute[i + 1]);
+      
+      if (currentBin && nextBin) {
+        const distance = Math.sqrt(
+          Math.pow(nextBin.lat - currentBin.lat, 2) + 
+          Math.pow(nextBin.lng - currentBin.lng, 2)
+        ) * 111; // Rough conversion to kilometers
+        totalDistance += distance;
+      }
+    }
+    return totalDistance.toFixed(2);
+  };
+  
+  return (
+    <div className="p-4 bg-secondary/50 rounded-lg">
+      <h3 className="font-medium mb-2 flex items-center">
+        <Route className="h-4 w-4 mr-2" /> 
+        Optimized Route Information
+      </h3>
+      <p className="text-sm text-muted-foreground mb-2">
+        Using Travelling Salesman Problem algorithm to find shortest route between bins.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {optimizedRoute.map((binId, index) => {
+          const bin = binsData.find(b => b.id === binId);
+          return (
+            <div key={index} className="flex items-center">
+              <Badge variant="outline" className="bg-eco-100">
+                {bin?.location}
+              </Badge>
+              {index < optimizedRoute.length - 1 && (
+                <span className="px-1">→</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-sm">
+        Total route distance: <span className="font-semibold">{calculateTotalDistance()} km</span>
+      </div>
+    </div>
+  );
+};
+
 const DriverDashboard = () => {
   const [activeBin, setActiveBin] = useState<number | null>(null);
   const [activeFeature, setActiveFeature] = useState<string>("map");
+  const [optimizedRoute, setOptimizedRoute] = useState<number[]>([]);
   const { toast } = useToast();
+
+  // Calculate optimized route using TSP
+  useEffect(() => {
+    if (binsData.length > 0) {
+      const tour = solveTSP(binsData);
+      setOptimizedRoute(tour);
+    }
+  }, []);
 
   const handleCollectBin = (binId: number) => {
     toast({
@@ -269,7 +379,7 @@ const DriverDashboard = () => {
           <DashboardSectionCard
             title="Map View"
             shortDescription="View bin locations"
-            icon={<MapIcon className="text-eco-600" />}
+            icon={<MapPin className="text-eco-600" />}
             popoverTitle="Interactive Map View"
             popoverDescription="Access a detailed map showing all bin locations. Get optimized routes to efficiently collect from multiple bins in an area."
             isActive={activeFeature === "map"}
@@ -314,7 +424,7 @@ const DriverDashboard = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Route Zone:</span>
-                  <span className="font-medium">Downtown Area</span>
+                  <span className="font-medium">Chennai Area</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Vehicle:</span>
@@ -372,7 +482,7 @@ const DriverDashboard = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span>Bin Locations</span>
+                    <span>Bin Locations with TSP Route</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="icon" className="h-8 w-8 rounded-full">
@@ -381,20 +491,24 @@ const DriverDashboard = () => {
                       </PopoverTrigger>
                       <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
                         <div className="space-y-2">
-                          <h4 className="font-semibold">Interactive Google Map</h4>
+                          <h4 className="font-semibold">Travelling Salesman Route</h4>
                           <p className="text-sm text-muted-foreground">
-                            This map shows all bin locations in your area. Click on a marker to see bin details.
-                            The system automatically provides optimized routes covering all bins efficiently.
+                            This map shows the optimized route between all bins using the Travelling Salesman Problem algorithm.
+                            The blue line represents the shortest path to visit all bins once.
                           </p>
                         </div>
                       </PopoverContent>
                     </Popover>
                   </CardTitle>
-                  <CardDescription>Real-time map of all bins in your area</CardDescription>
+                  <CardDescription>Optimized collection route based on TSP algorithm</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-[16/9] rounded-md border overflow-hidden relative">
                     <GoogleMapComponent />
+                  </div>
+                  
+                  <div className="mt-6">
+                    <OptimizedRouteInfo optimizedRoute={optimizedRoute} />
                   </div>
                   
                   <div className="mt-6 flex flex-wrap gap-4">
@@ -458,6 +572,9 @@ const DriverDashboard = () => {
                                   <span>Last collected: {bin.lastCollected}</span>
                                 </div>
                               </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                <span>Lat: {bin.lat.toFixed(4)}, Lng: {bin.lng.toFixed(4)}</span>
+                              </div>
                             </div>
                             <Button 
                               size="sm" 
@@ -503,10 +620,10 @@ const DriverDashboard = () => {
                   </PopoverTrigger>
                   <PopoverContent className="w-80 animate-in fade-in-50 zoom-in-95">
                     <div className="space-y-2">
-                      <h4 className="font-semibold">Optimized Route</h4>
+                      <h4 className="font-semibold">TSP Optimized Route</h4>
                       <p className="text-sm text-muted-foreground">
-                        Your route is continually optimized based on bin fill levels, traffic conditions, and priority areas.
-                        The system ensures you cover all high-priority bins with the shortest possible distance.
+                        Your route is optimized using the Travelling Salesman Problem algorithm to find the shortest possible path
+                        visiting all bins exactly once and returning to the start. This minimizes fuel consumption and travel time.
                       </p>
                     </div>
                   </PopoverContent>
@@ -520,34 +637,60 @@ const DriverDashboard = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="p-4 bg-secondary/50 rounded-lg">
-                  <h3 className="font-medium mb-2">Route Optimization Active</h3>
+                  <h3 className="font-medium mb-2 flex items-center">
+                    <Route className="h-4 w-4 mr-2" /> 
+                    TSP Route Optimization Active
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    Your route is being continuously optimized based on bin fill levels, traffic conditions, and priority areas.
+                    Your route is optimized using the Travelling Salesman Problem algorithm to minimize the total distance traveled.
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="text-sm font-medium mb-1">Next Collection</h4>
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 text-waste-high mr-1" />
-                      <span className="text-sm">Main Street #103</span>
+                {optimizedRoute.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="text-sm font-medium mb-1">Next Collection</h4>
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 text-waste-high mr-1" />
+                        <span className="text-sm">{
+                          binsData.find(bin => bin.id === optimizedRoute[0])?.location || "Unknown"
+                        }</span>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        Estimated arrival: 10 minutes
+                      </div>
                     </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      Estimated arrival: 10 minutes
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="text-sm font-medium mb-1">Total Route Distance</h4>
+                      {optimizedRoute.length > 0 && (
+                        <p className="text-lg font-medium">
+                          {(() => {
+                            let totalDistance = 0;
+                            for (let i = 0; i < optimizedRoute.length - 1; i++) {
+                              const currentBin = binsData.find(b => b.id === optimizedRoute[i]);
+                              const nextBin = binsData.find(b => b.id === optimizedRoute[i + 1]);
+                              
+                              if (currentBin && nextBin) {
+                                const distance = Math.sqrt(
+                                  Math.pow(nextBin.lat - currentBin.lat, 2) + 
+                                  Math.pow(nextBin.lng - currentBin.lng, 2)
+                                ) * 111; // Rough conversion to kilometers
+                                totalDistance += distance;
+                              }
+                            }
+                            return totalDistance.toFixed(2) + " km";
+                          })()}
+                        </p>
+                      )}
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        Estimated completion: 3:30 PM
+                      </div>
                     </div>
                   </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="text-sm font-medium mb-1">Total Route Distance</h4>
-                    <p className="text-lg font-medium">12.5 km</p>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      Estimated completion: 3:30 PM
-                    </div>
-                  </div>
-                </div>
+                )}
                 
                 <Button className="w-full">
-                  <MapIcon className="h-4 w-4 mr-2" />
+                  <MapPin className="h-4 w-4 mr-2" />
                   View Complete Route
                 </Button>
               </div>
@@ -583,7 +726,7 @@ const BinAttenders = () => {
                     <ul className="space-y-3">
                       <li className="flex items-start">
                         <div className="mt-1 bg-eco-100 rounded-full p-1 mr-2">
-                          <MapIcon className="h-4 w-4 text-eco-600" />
+                          <MapPin className="h-4 w-4 text-eco-600" />
                         </div>
                         <div>
                           <h4 className="font-medium">Smart Navigation</h4>
