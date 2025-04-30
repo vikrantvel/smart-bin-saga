@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -116,8 +115,8 @@ const CustomerDashboard = () => {
                 <div className="h-24 w-24 rounded-full bg-secondary flex items-center justify-center mb-4">
                   <User className="h-12 w-12 text-muted-foreground" />
                 </div>
-                <h3 className="font-medium text-lg">John Smith</h3>
-                <p className="text-muted-foreground">john.smith@example.com</p>
+                <h3 className="font-medium text-lg">Vikrantvel</h3>
+                <p className="text-muted-foreground">vikrantvel@example.com</p>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -141,7 +140,7 @@ const CustomerDashboard = () => {
         <div className="w-full md:w-3/4">
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>Welcome Back, John!</CardTitle>
+              <CardTitle>Welcome Back, Vikrantvel!</CardTitle>
               <CardDescription>
                 Track your waste management activities and earn rewards for responsible disposal.
               </CardDescription>
