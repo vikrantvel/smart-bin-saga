@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -541,7 +542,7 @@ const DriverDashboard = () => {
                 <div className="h-24 w-24 rounded-full bg-secondary flex items-center justify-center mb-4">
                   <User className="h-12 w-12 text-muted-foreground" />
                 </div>
-                <h3 className="font-medium text-lg">Michael Johnson</h3>
+                <h3 className="font-medium text-lg">Eric Rene Jhon</h3>
                 <p className="text-muted-foreground">Driver ID: ECO-DR-42698</p>
               </div>
               <div className="space-y-2">
